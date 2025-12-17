@@ -36,11 +36,22 @@ npm install
 ```bash
 npm run seed
 ```
+   - Creates sample users, movies, and TV shows
+   - Clears existing data first
+   - Requires MONGO_URI environment variable
 
 3. **Start development server**:
 ```bash
 npm run start:dev
 ```
+
+## API Documentation
+
+Interactive Swagger UI available at: `http://localhost:8080/api`
+
+- Test endpoints directly in browser
+- Auto-generated from NestJS decorators
+- Request/response schemas with examples
 
 ## API Endpoints
 
@@ -62,6 +73,8 @@ Headers: user-id: <userId>
 GET /my-list?page=1&limit=20
 Headers: user-id: <userId>
 ```
+
+> 💡 **Tip**: Use the Swagger UI at `/api` for interactive testing with proper request validation and response examples.
 
 ## Testing
 

@@ -26,22 +26,19 @@ export class MyListService {
     try {
       const { contentId, contentType } = addToListDto;
 
-      // Validate that content exists
-      if (contentType === ContentType.MOVIE) {
-        const movie = await this.movieModel.findById(contentId);
-        if (!movie) {
-          throw new NotFoundException(ERROR_MESSAGES.MOVIE_NOT_FOUND);
-        }
-      } else if (contentType === ContentType.TVSHOW) {
-        const tvShow = await this.tvShowModel.findById(contentId);
-        if (!tvShow) {
-          throw new NotFoundException(ERROR_MESSAGES.TV_SHOW_NOT_FOUND);
-        }
+      // Parallel validation: check content exists and if already in list
+      const [contentExists, existingItem] = await Promise.all([
+        this.validateContentExists(contentId, contentType),
+        this.myListModel.findOne({ userId, contentId })
+      ]);
+
+      if (!contentExists) {
+        const message = contentType === ContentType.MOVIE ? 
+          ERROR_MESSAGES.MOVIE_NOT_FOUND : ERROR_MESSAGES.TV_SHOW_NOT_FOUND;
+        throw new NotFoundException(message);
       }
 
-      // Check if already exists
-      const existing = await this.myListModel.findOne({ userId, contentId });
-      if (existing) {
+      if (existingItem) {
         throw new ConflictException(ERROR_MESSAGES.ITEM_ALREADY_EXISTS);
       }
 
@@ -54,7 +51,7 @@ export class MyListService {
       const savedItem = await listItem.save();
       
       // Invalidate user's cache after successful addition
-      const pattern = `my-list:${userId}:*`;
+      const pattern = `my-list:user:${userId}:*`;
       const keys = await this.redisClient.keys(pattern) as string[];
       if (keys.length > 0) {
         await Promise.all(keys.map(key => this.redisClient.del(key)));
@@ -64,6 +61,18 @@ export class MyListService {
     } catch (error) {
       throw error;
     }
+  }
+
+  // Helper method for content validation
+  private async validateContentExists(contentId: string, contentType: ContentType): Promise<boolean> {
+    if (contentType === ContentType.MOVIE) {
+      const movie = await this.movieModel.findById(contentId).lean();
+      return !!movie;
+    } else if (contentType === ContentType.TVSHOW) {
+      const tvShow = await this.tvShowModel.findById(contentId).lean();
+      return !!tvShow;
+    }
+    return false;
   }
 
   // Remove content from user's list and invalidate cache
@@ -76,7 +85,7 @@ export class MyListService {
       }
       
       // Invalidate user's cache after successful removal
-      const pattern = `my-list:${userId}:*`;
+      const pattern = `my-list:user:${userId}:*`;
       const keys = await this.redisClient.keys(pattern) as string[];
       if (keys.length > 0) {
         await Promise.all(keys.map(key => this.redisClient.del(key)));
@@ -92,7 +101,7 @@ export class MyListService {
   async getMyList(userId: string, page: number, limit: number, offset: number) {
     try {
       // Check cache first for performance (sub-10ms requirement)
-      const cacheKey = `my-list:${userId}:${page}:${limit}`;
+      const cacheKey = `my-list:user:${userId}:page:${page}:limit:${limit}`;
       const cachedResult = await this.redisClient.get(cacheKey) as string | null;
       
       if (cachedResult) {

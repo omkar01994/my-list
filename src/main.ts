@@ -1,7 +1,7 @@
 import { NestFactory } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
-import { writeFileSync } from 'fs';
+import { writeFileSync, mkdirSync, existsSync } from 'fs';
 import { AppModule } from './app.module';
 
 async function bootstrap() {
@@ -35,6 +35,11 @@ async function bootstrap() {
   
   const document = SwaggerModule.createDocument(app, config);
   SwaggerModule.setup('api', app, document);
+  
+  // Create docs directory if it doesn't exist
+  if (!existsSync('docs')) {
+    mkdirSync('docs', { recursive: true });
+  }
   writeFileSync('docs/swagger.json', JSON.stringify(document));
   
   await app.listen(port);
